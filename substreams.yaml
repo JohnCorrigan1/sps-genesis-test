@@ -1,0 +1,65 @@
+specVersion: v0.1.0
+package:
+  name: "test_genesis"
+  version: v0.0.1
+
+imports:
+  entities: https://github.com/streamingfast/substreams-sink-entity-changes/releases/download/v1.3.0/substreams-sink-entity-changes-v1.3.0.spkg
+
+protobuf:
+  files:
+    - address.proto
+  importPaths:
+    - ./proto
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/substreams.wasm
+
+modules:
+  - name: map_is_contracts
+    kind: map
+    initialBlock: 1 
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:address.IsContracts 
+
+  - name: store_is_contracts
+    kind: store
+    initialBlock: 1 
+    updatePolicy: set
+    valueType: int64
+    inputs:
+      - map: map_is_contracts
+
+  - name: map_address_txs
+    kind: map
+    initialBlock: 1 
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:address.AddressTxs
+
+  - name: store_address_txs
+    kind: store
+    initialBlock: 1
+    updatePolicy: add
+    valueType: bigint 
+    inputs:
+      - map: map_address_txs
+
+  - name: graph_out
+    kind: map
+    initialBlock: 1
+    inputs:
+      - map: map_address_txs
+      - store: store_is_contracts
+        mode: get
+      - store: store_address_txs
+        mode: get
+    output:
+      type: proto:sf.substreams.sink.entity.v1.EntityChanges 
+
+network: mainnet

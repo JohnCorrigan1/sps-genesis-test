@@ -1,0 +1,5 @@
+type Address @entity(immutable: false) {
+    id: ID!
+    isContract: Boolean! 
+    numTxs: BigInt! 
+}

@@ -1,0 +1,17 @@
+specVersion: 0.0.4
+description: Kelp Dao substreams powered subgraph 
+repository: https://github.com/JohnCorrigan1/kelpDao-SPS.git 
+schema:
+  file: schema.graphql
+
+dataSources:
+  - kind: substreams
+    name: Test_From_Genesis 
+    network: mainnet 
+    source:
+      package:
+        moduleName: graph_out
+        file: ./test-genesis-v0.0.1.spkg
+    mapping:
+      kind: substreams/graph-entities
+      apiVersion: 0.0.5
