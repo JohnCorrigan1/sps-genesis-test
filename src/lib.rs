@@ -1,21 +1,15 @@
 mod abi;
 mod pb;
-use hex_literal::hex;
 use pb::address;
-use prost::Message;
-use substreams::pb::substreams::module::input::store;
-use substreams::{key, prelude::*};
-use substreams::{log, store::StoreSetProto, Hex};
+use substreams::prelude::*;
+use substreams::{store::StoreSetProto, Hex};
 use substreams_entity_change::pb::entity::EntityChanges;
 use substreams_entity_change::tables::Tables;
+use substreams_ethereum::pb::eth::v2::Call;
 use substreams_ethereum::pb::sf::ethereum::r#type::v2 as eth;
-
-// Bored Ape Club Contract
-const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
 
 substreams_ethereum::init!();
 
-/// Extracts transfers events from the contract
 #[substreams::handlers::map]
 fn map_is_contracts(
     blk: eth::Block,
@@ -25,20 +19,29 @@ fn map_is_contracts(
         .iter()
         .map(|tx| {
             tx.calls.iter().map(|call| {
-                call.account_creations.iter().map(|accountCreation| {
+                // substreams::log::info!("account creations: {:?}", call.account_creations);
+                // substreams::log::info!("code changes: {:?}", call.code_changes.len() > 0);
+                // substreams::log::info!("call {:?}", call);
+                // substreams::log::info!("call type {:?}", call.call_type);
+                call.account_creations.iter().map(|account_creation| {
                     let is_contract;
                     if call.code_changes.len() > 0 {
                         is_contract = true;
-                        substreams::log::info!("call is contract");
                     } else {
                         is_contract = false;
-                        substreams::log::info!("call is not contract");
                     }
-
+                    // if call.account_creations.len() > 1 && call.code_changes.len() == 0 {
+                    // panic!("multiple account creations");
                     address::IsAccount {
-                        id: Hex::encode(&accountCreation.account),
+                        id: Hex::encode(&account_creation.account),
                         is_contract,
                     }
+                    // } else {
+                    // address::IsAccount {
+                    //     id: "1".to_string(),
+                    //     is_contract: false,
+                    // }
+                    // }
                 })
             })
         })
@@ -49,11 +52,36 @@ fn map_is_contracts(
     Ok(Some(address::IsAccounts { is_accounts }))
 }
 
+// fn get_is_account(call: &Call) -> Result<address::IsAccount, substreams::errors::Error> {
+//     Ok(call
+//         .account_creations
+//         .iter()
+//         .map(|account_creation| {
+//             let is_contract;
+//             if call.code_changes.len() > 0 {
+//                 is_contract = true;
+//             } else {
+//                 is_contract = false;
+//             }
+
+//             address::IsAccount {
+//                 id: Hex::encode(&account_creation.account),
+//                 is_contract,
+//             }
+//         })
+//         .collect())
+// }
+
 #[substreams::handlers::store]
-fn store_is_contracts(addresses: address::IsAccounts, store: StoreSetInt64) {
+fn store_is_contracts(addresses: address::IsAccounts, store: StoreSetProto<address::IsContract>) {
     for address in addresses.is_accounts {
-        let is_contract = if address.is_contract { 1 } else { 0 };
-        store.set(0, address.id, &is_contract);
+        store.set(
+            0,
+            &address.id,
+            &address::IsContract {
+                is_contract: address.is_contract,
+            },
+        );
     }
 }
 
@@ -66,7 +94,7 @@ fn map_address_txs(
         .iter()
         .map(|tx| {
             tx.calls.iter().map(|call| address::AddressTx {
-                address: Hex::encode(call.caller.clone()),
+                address: Hex::encode(&call.caller),
             })
         })
         .flatten()
@@ -76,60 +104,24 @@ fn map_address_txs(
 }
 
 #[substreams::handlers::store]
-fn store_address_txs(address_txs: address::AddressTxs, store: StoreAddBigInt) {
+fn store_address_txs(address_txs: address::AddressTxs, store: StoreAddInt64) {
     for address_tx in address_txs.address_txs {
-        store.add(0, &address_tx.address, substreams::scalar::BigInt::from(1));
+        store.add(0, address_tx.address, 1);
     }
 }
-
-// #[substreams::handlers::map]
-// fn graph_out(
-//     addresses: address::AddressTxs,
-//     is_contract_store: StoreGetInt64,
-//     txs_store: StoreGetBigInt,
-// ) -> Result<Option<address::Addresses>, substreams::errors::Error> {
-//     let addresses: Vec<_> = addresses
-//         .address_txs
-//         .iter()
-//         .map(|address_tx| {
-//             let is_contract;
-//             if let Some(is_account) = is_contract_store.get_at(0, &address_tx.address) {
-//                 is_contract = is_account == 1;
-//             } else {
-//                 is_contract = false;
-//             };
-
-//             let num_txs: u64;
-//             if let Some(txs) = txs_store.get_at(0, &address_tx.address) {
-//                 num_txs = txs.try_into().unwrap();
-//             } else {
-//                 num_txs = 1;
-//             };
-//             // let is_account = 1;
-
-//             address::Address {
-//                 id: address_tx.address.clone(),
-//                 is_contract,
-//                 num_txs,
-//             }
-//         })
-//         .collect();
-
-//     Ok(Some(address::Addresses { addresses }))
-// }
 
 #[substreams::handlers::map]
 fn graph_out(
     addresses: address::AddressTxs,
-    is_contract_store: StoreGetInt64,
-    txs_store: StoreGetBigInt,
+    is_contract_store: StoreGetProto<address::IsContract>,
+    txs_store: StoreGetInt64,
 ) -> Result<EntityChanges, substreams::errors::Error> {
     let mut tables = Tables::new();
 
     for address_tx in addresses.address_txs {
         let is_contract;
         if let Some(is_account) = is_contract_store.get_at(0, &address_tx.address) {
-            is_contract = is_account == 1;
+            is_contract = is_account.is_contract;
         } else {
             is_contract = false;
         };
@@ -142,7 +134,7 @@ fn graph_out(
         };
 
         tables
-            .update_row("Address", address_tx.address)
+            .update_row("Address", &address_tx.address)
             .set("isContract", is_contract)
             .set("numTxs", num_txs);
     }

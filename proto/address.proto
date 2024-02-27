@@ -3,6 +3,25 @@ syntax = "proto3";
 
 package address;
 
+message AddressesAndTxs {
+  repeated Account accounts = 1;
+}
+
+message Account {
+  string id = 1;
+  bool is_contract = 2;
+  uint64 num_txs = 3; 
+}
+
+message NumTxs {
+  uint32 num_txs = 1;
+}
+
+
+message IsContract {
+  bool is_contract = 1;
+}
+
 message IsAccounts  {
   repeated IsAccount is_accounts = 1;
 }

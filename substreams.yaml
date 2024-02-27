@@ -20,23 +20,23 @@ binaries:
 modules:
   - name: map_is_contracts
     kind: map
-    initialBlock: 1 
+    initialBlock: 46000 
     inputs:
       - source: sf.ethereum.type.v2.Block
     output:
-      type: proto:address.IsContracts 
+      type: proto:address.IsAccounts
 
   - name: store_is_contracts
     kind: store
-    initialBlock: 1 
+    initialBlock: 46000 
     updatePolicy: set
-    valueType: int64
+    valueType: proto:address.IsContract 
     inputs:
       - map: map_is_contracts
 
   - name: map_address_txs
     kind: map
-    initialBlock: 1 
+    initialBlock: 46000 
     inputs:
       - source: sf.ethereum.type.v2.Block
     output:
@@ -44,15 +44,15 @@ modules:
 
   - name: store_address_txs
     kind: store
-    initialBlock: 1
+    initialBlock: 46000 
     updatePolicy: add
-    valueType: bigint 
+    valueType: int64 
     inputs:
       - map: map_address_txs
 
   - name: graph_out
     kind: map
-    initialBlock: 1
+    initialBlock: 46000 
     inputs:
       - map: map_address_txs
       - store: store_is_contracts

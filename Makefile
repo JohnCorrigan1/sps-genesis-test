@@ -1,8 +1,9 @@
 ENDPOINT ?= mainnet.eth.streamingfast.io:443
 # START_BLOCK ?= 12292922
 # STOP_BLOCK ?= +10
-START_BLOCK ?= 1 
-STOP_BLOCK ?= +1000000
+START_BLOCK ?= 79900 
+STOP_BLOCK ?= +100000
+# STOP_BLOCK ?= +2
 
 .PHONY: build
 build:
